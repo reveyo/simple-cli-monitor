@@ -1,4 +1,4 @@
-# Ubuntu Monitor Hybrid 🐧💻
+# Simple Cli Moniteur 🐧💻
 
 Un moniteur système léger, orienté objet et optimisé pour Linux (Ubuntu). 
 Conçu spécifiquement pour les configurations matérielles hybrides (CPU + Multi-GPU), ce moniteur limite au maximum l'empreinte processeur et la consommation de batterie des PC portables.
@@ -33,13 +33,13 @@ pip install nvidia-ml-py
 
 1. Clonez ce dépôt sur votre machine :
 ```bash
-git clone https://github.com/votre-nom/ubuntu-monitor-hybrid.git
-cd ubuntu-monitor-hybrid
+git clone https://github.com/votre-nom/simple-cli-monitor.git
+cd simple-cli-monitor
 ```
 
 2. Lancez le moniteur :
 ```bash
-python3 ubuntu_monitor_hybrid.py
+python3 simple-cli-monitor.py
 ```
 
 3. Appuyez sur `Ctrl+C` pour quitter proprement.
