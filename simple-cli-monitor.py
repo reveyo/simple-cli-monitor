@@ -216,7 +216,8 @@ class SystemMonitor:
                 # Ignore partitions (e.g., sda1) to keep only the physical disk (sda, nvme0n1)
                 if name.startswith("sd") and name[-1].isdigit(): continue
                 if name.startswith("nvme") and "p" in name: continue
-                if not (name.startswith("sd") or name.startswith("nvme")): continue
+                if name.startswith("md") and "p" in name: continue
+                if not (name.startswith("sd") or name.startswith("nvme") or name.startswith("md")): continue
 
                 # Index 5: read sectors, Index 9: written sectors
                 sec_r, sec_w = int(p[5]), int(p[9])
@@ -235,6 +236,36 @@ class SystemMonitor:
                 disks[name] = {"r_sect": sec_r, "w_sect": sec_w, "rs": rs, "ws": ws, "temp": temp}
         except Exception: pass
         return disks
+
+    def get_raid(self, dt):
+        """
+        Situation du creai logiccel de la machine
+        """
+        raids = {}
+        curseur = 0
+        try:
+            active, raid, disques, etat = False, None, None, None
+            peripherique = ""
+            for l in self._read_text("/proc/mdstat").splitlines():
+                p = l.split()
+                if len(p)==0 : continue
+                name = p[0]
+
+                if name.startswith("md"):
+                    curseur = 1
+                    peripherique, active, raid = name, p[2], p[3]
+                    continue
+
+                if curseur==1:
+                    curseur = 0
+                    disques, etat =  p[-2], p[-1]
+                    if len(peripherique) > 0:
+                        raids[peripherique] = {"active": active, "raid": raid, "disques": disques, "etat": etat}
+                    active, raid, disques, etat = False, None, None, None
+                    continue
+
+        except Exception: pass
+        return raids
 
     def get_gpu(self, dt):
         """Retrieves GPU metrics (Dedicated Nvidia and Intel/AMD iGPUs)."""
@@ -310,6 +341,8 @@ class SystemMonitor:
 
         disks = self.get_disk_stats(dt)
         for k, v in disks.items(): self.prev_disks[k] = {"r_sect": v["r_sect"], "w_sect": v["w_sect"]}
+
+        raid = self.get_raid(dt)
 
         gpus = self.get_gpu(dt)
         for g in gpus:
