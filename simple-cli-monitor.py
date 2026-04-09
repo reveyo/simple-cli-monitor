@@ -339,10 +339,9 @@ class SystemMonitor:
         cores = self.get_cpu_cores(dt)
         for k, v in cores.items(): self.prev_cores[k] = {"raw": v["raw"]}
 
+        raids = self.get_raid(dt)
         disks = self.get_disk_stats(dt)
         for k, v in disks.items(): self.prev_disks[k] = {"r_sect": v["r_sect"], "w_sect": v["w_sect"]}
-
-        raid = self.get_raid(dt)
 
         gpus = self.get_gpu(dt)
         for g in gpus:
@@ -376,7 +375,12 @@ class SystemMonitor:
             t_str = f"{d['temp']:.0f}°C" if d['temp'] else "--°C"
             rc = Terminal.W if d['rs'] < 1024 else (Terminal.Y if d['rs'] < 100e6 else Terminal.R)
             wc = Terminal.W if d['ws'] < 1024 else (Terminal.Y if d['ws'] < 100e6 else Terminal.R)
-            out.append(f" {name:<7} {t_str} R: {rc}{Terminal.fmt_bytes(d['rs'])}/s{Terminal.END} W: {wc}{Terminal.fmt_bytes(d['ws'])}/s{Terminal.END}{Terminal.CLR_LINE}")
+            if name not in raids:
+                out.append(f" {name:<7} {t_str} R: {rc}{Terminal.fmt_bytes(d['rs'])}/s{Terminal.END} W: {wc}{Terminal.fmt_bytes(d['ws'])}/s{Terminal.END}{Terminal.CLR_LINE}")
+            else:
+                dr = raids[name]
+                debit = f"{wc}{Terminal.fmt_bytes(d['ws'])}/s{Terminal.END}"
+                out.append(f" {name:<7} {t_str} R: {rc}{Terminal.fmt_bytes(d['rs'])}/s{Terminal.END} W: {debit:<18} {Terminal.B}{dr['disques']} {dr['etat']}{Terminal.END}{Terminal.CLR_LINE}")
 
         for p in self.cached_parts:
             pct = (p['u']/p['t']*100) if p['t'] else 0
