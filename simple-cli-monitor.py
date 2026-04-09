@@ -52,6 +52,24 @@ class Terminal:
             n /= 1024
         return f"{n:.1f}P"
 
+    @staticmethod
+    def color_raid(raid):
+        if raid[0] == raid[2]:
+            col = Terminal.G
+        else:
+            col = Terminal.R
+        return f"{col}{raid[0]}{Terminal.END}{raid[1:]}"
+
+    @staticmethod
+    def color_etat(etat):
+        res = f""
+        for u in etat:
+            if u == "U":
+                col = Terminal.G
+            else:
+                col = Terminal.R
+            res = res + f"{col}{u}{Terminal.END}"
+        return res
 
 class SystemMonitor:
     def __init__(self):
@@ -380,7 +398,9 @@ class SystemMonitor:
             else:
                 dr = raids[name]
                 debit = f"{wc}{Terminal.fmt_bytes(d['ws'])}/s{Terminal.END}"
-                out.append(f" {name:<7} {t_str} R: {rc}{Terminal.fmt_bytes(d['rs'])}/s{Terminal.END} W: {debit:<18} {Terminal.B}{dr['disques']} {dr['etat']}{Terminal.END}{Terminal.CLR_LINE}")
+                raid = f"{dr['raid']}:{Terminal.color_raid(dr['disques'][1:-1])}{Terminal.END}"
+                etat =f" disk:{Terminal.color_etat(dr['etat'][1:-1])}{Terminal.END}{Terminal.END}"
+                out.append(f" {name:<7} {t_str} R: {rc}{Terminal.fmt_bytes(d['rs'])}/s{Terminal.END} W: {debit:<20} {raid}{etat}{Terminal.CLR_LINE}")
 
         for p in self.cached_parts:
             pct = (p['u']/p['t']*100) if p['t'] else 0
