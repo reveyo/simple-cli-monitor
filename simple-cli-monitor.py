@@ -347,30 +347,38 @@ class SystemMonitor:
             except Exception: pass
         return gpus
 
-    def render(self):
-        """Gathers metrics and generates the full flicker-free display"""
+    def delta_time(self):
+
         cur_time = time.time()
-        dt = cur_time - self.prev_time
+        self.dt = cur_time - self.prev_time
         self.prev_time = cur_time
 
+
+    def valeur_systeme(self):
         # Update states (save for T+1)
-        cores = self.get_cpu_cores(dt)
-        for k, v in cores.items(): self.prev_cores[k] = {"raw": v["raw"]}
+        self.cores = self.get_cpu_cores(self.dt)
+        for k, v in self.cores.items(): self.prev_cores[k] = {"raw": v["raw"]}
 
-        raids = self.get_raid(dt)
-        disks = self.get_disk_stats(dt)
-        for k, v in disks.items(): self.prev_disks[k] = {"r_sect": v["r_sect"], "w_sect": v["w_sect"]}
+        self.raids = self.get_raid(self.dt)
+        self.disks = self.get_disk_stats(self.dt)
+        for k, v in self.disks.items(): self.prev_disks[k] = {"r_sect": v["r_sect"], "w_sect": v["w_sect"]}
 
-        gpus = self.get_gpu(dt)
-        for g in gpus:
+        self.gpus = self.get_gpu(self.dt)
+        for g in self.gpus:
             if "raw_rc6" in g: self.prev_gpu_state[g["id"]] = {"rc6": g["raw_rc6"]}
 
         # Optimization: Only read partitions every 30 seconds as I/O is heavy and space varies slowly
         if self.tick_counter % 30 == 0:
             self.cached_parts = self.get_partitions()
 
-        mem = self.get_mem()
-        bats = self.get_battery()
+        self.mem = self.get_mem()
+        self.bats = self.get_battery()
+
+
+    def render(self):
+        """Gathers metrics and generates the full flicker-free display"""
+        self.delta_time()
+        self.valeur_systeme()
 
         # UI rendering construction in an array to print only once. 
         # Terminal.HOME resets cursor to (0,0). Terminal.CLR_LINE overwrites ghost characters.
@@ -379,8 +387,8 @@ class SystemMonitor:
         out.append(f"{Terminal.B}║{Terminal.END} {Terminal.BOLD}SYSTEM MONITOR OOP{Terminal.END} {Terminal.W}{time.strftime('%H:%M:%S')}{Terminal.END}{Terminal.CLR_LINE}")
 
         # --- RAM ---
-        m_tot = mem.get("MemTotal", 1)
-        m_used = m_tot - mem.get("MemAvailable", 0)
+        m_tot = self.mem.get("MemTotal", 1)
+        m_used = m_tot - self.mem.get("MemAvailable", 0)
         m_pct = (m_used / m_tot * 100) if m_tot else 0
         bar = "█"*int(m_pct/5) + "░"*(20-int(m_pct/5))
         out.append(f"{Terminal.B}╠{'─'*60}╣{Terminal.END}{Terminal.CLR_LINE}")
@@ -389,14 +397,14 @@ class SystemMonitor:
         # --- DISK I/O ---
         out.append(f"{Terminal.B}╠{'─'*60}╣{Terminal.END}{Terminal.CLR_LINE}")
         out.append(f" {Terminal.BOLD}DISK I/O{Terminal.END}{Terminal.CLR_LINE}")
-        for name, d in disks.items():
+        for name, d in self.disks.items():
             t_str = f"{d['temp']:.0f}°C" if d['temp'] else "--°C"
             rc = Terminal.W if d['rs'] < 1024 else (Terminal.Y if d['rs'] < 100e6 else Terminal.R)
             wc = Terminal.W if d['ws'] < 1024 else (Terminal.Y if d['ws'] < 100e6 else Terminal.R)
-            if name not in raids:
+            if name not in self.raids:
                 out.append(f" {name:<7} {t_str} R: {rc}{Terminal.fmt_bytes(d['rs'])}/s{Terminal.END} W: {wc}{Terminal.fmt_bytes(d['ws'])}/s{Terminal.END}{Terminal.CLR_LINE}")
             else:
-                dr = raids[name]
+                dr = self.raids[name]
                 debit = f"{wc}{Terminal.fmt_bytes(d['ws'])}/s{Terminal.END}"
                 raid = f"{dr['raid']}:{Terminal.color_raid(dr['disques'][1:-1])}{Terminal.END}"
                 etat =f" disk:{Terminal.color_etat(dr['etat'][1:-1])}{Terminal.END}{Terminal.END}"
@@ -408,15 +416,15 @@ class SystemMonitor:
             out.append(f" {p['m']:<7} {Terminal.color_val(pct,60,85)} {Terminal.B}[{bar}]{Terminal.END} {Terminal.fmt_bytes(p['u'])}/{Terminal.fmt_bytes(p['t'])}{Terminal.CLR_LINE}")
 
         # --- BATTERY ---
-        if bats:
+        if self.bats:
             out.append(f"{Terminal.B}╠{'─'*60}╣{Terminal.END}{Terminal.CLR_LINE}")
-            for b in bats:
+            for b in self.bats:
                 ic = "⚡" if b['status']=="Charging" else "🔋"
                 out.append(f" {ic} {Terminal.color_val(b['pct'],20,50,True)} [{b['status']}] {b['watts']:.1f}W{Terminal.CLR_LINE}")
 
         # --- GPU ---
         out.append(f"{Terminal.B}╠{'─'*60}╣{Terminal.END}{Terminal.CLR_LINE}")
-        for g in gpus:
+        for g in self.gpus:
             ld = Terminal.color_val(g['load'],50,80) if g['load'] is not None else f"{Terminal.W}--%{Terminal.END}"
             tp = Terminal.color_val(g['temp'],60,80,unit="°C")
             xtra = f"Mem:{g['mem']}" if 'mem' in g else f"{g.get('freq')}MHz"
@@ -424,14 +432,14 @@ class SystemMonitor:
 
         # --- CPU ---
         out.append(f"{Terminal.B}╠{'─'*60}╣{Terminal.END}{Terminal.CLR_LINE}")
-        c_ids = sorted(cores.keys())
+        c_ids = sorted(self.cores.keys())
         # Display in 2 columns to save vertical space
         for i in range(0, len(c_ids), 2):
-            c1 = cores[c_ids[i]]
+            c1 = self.cores[c_ids[i]]
             s1 = f"#{c_ids[i]:<2} {Terminal.color_val(c1['usage'],50,85)} {c1['freq']:.1f}G {Terminal.color_val(c1['temp'],60,85,unit='°C')}"
             s2 = ""
             if i+1 < len(c_ids):
-                c2 = cores[c_ids[i+1]]
+                c2 = self.cores[c_ids[i+1]]
                 s2 = f"│ #{c_ids[i+1]:<2} {Terminal.color_val(c2['usage'],50,85)} {c2['freq']:.1f}G {Terminal.color_val(c2['temp'],60,85,unit='°C')}"
             out.append(f" {s1:<35} {s2}{Terminal.CLR_LINE}")
 
