@@ -32,6 +32,14 @@ class Terminal:
     CLR_SCR = "\033[2J\033[H" # Clears the entire screen (used only at startup)
 
     @staticmethod
+    def debut_ligne():
+        return f"{Terminal.B}║{Terminal.END}"
+
+    @staticmethod
+    def ligne_separateur():
+        return f"{Terminal.B}╠{'─'*60}╣{Terminal.END}"
+
+    @staticmethod
     def color_val(val, low=50, high=80, inverse=False, unit="%"):
         """Returns a formatted string with conditional coloring (Green, Yellow, Red)."""
         if val is None: return f"{Terminal.W}--{unit}{Terminal.END}"
@@ -82,6 +90,8 @@ class SystemMonitor:
         self.prev_time = time.time()
         self.tick_counter = 0
         self.cached_parts = []
+
+
 
         # Hardware discovery and baseline values initialization (T-1)
         self._init_sysfs_cache()
@@ -184,6 +194,34 @@ class SystemMonitor:
                         "watts": (self._read_int(b/"power_now") or 0) / 1e6 # power_now is in microwatts
                     })
         return bats
+
+    def get_cpu_info(self):
+        cpu_info = {}
+        try:
+            name, cache, flags = "", "", ""
+            cpu_info["count"] = list()
+            for l in self._read_text("/proc/cpuinfo").splitlines():
+                if len(l) == 0:
+                    continue
+                p = l.split(":")
+                if p and p[0].startswith("model name"):
+                    cpu_info["name"] = p[1]
+                if p and p[0].startswith("cache size"):
+                    cpu_info["cache"] = p[1]
+                if p and p[0].startswith("flags"):
+                    cpu_info["flags"] = p[1]
+                if p and p[0].startswith("processor"):
+                    cpu_info["count"].append(p[1])
+
+        except Exception: pass
+        if cpu_info:
+            cpu_info["core"] = len(cpu_info["count"])
+            if 'vmx' in  cpu_info["flags"]:
+                cpu_info["virtualiation"] = "Intel VT-x"
+            if 'smv' in  cpu_info["flags"]:
+                cpu_info["virtualiation"] = "AMD-V"
+
+        return cpu_info
 
     def get_cpu_cores(self, dt):
         """
@@ -353,9 +391,9 @@ class SystemMonitor:
         self.dt = cur_time - self.prev_time
         self.prev_time = cur_time
 
-
     def valeur_systeme(self):
         # Update states (save for T+1)
+        self.cpu_info = self.get_cpu_info()
         self.cores = self.get_cpu_cores(self.dt)
         for k, v in self.cores.items(): self.prev_cores[k] = {"raw": v["raw"]}
 
@@ -375,10 +413,9 @@ class SystemMonitor:
         self.bats = self.get_battery()
 
 
+
     def render_text(self):
         """Gathers metrics and generates the full flicker-free display"""
-        self.delta_time()
-        self.valeur_systeme()
 
         # UI rendering construction in an array to print only once. 
         # Terminal.HOME resets cursor to (0,0). Terminal.CLR_LINE overwrites ghost characters.
@@ -391,47 +428,47 @@ class SystemMonitor:
         m_used = m_tot - self.mem.get("MemAvailable", 0)
         m_pct = (m_used / m_tot * 100) if m_tot else 0
         bar = "█"*int(m_pct/5) + "░"*(20-int(m_pct/5))
-        out.append(f"{Terminal.B}╠{'─'*60}╣{Terminal.END}{Terminal.CLR_LINE}")
-        out.append(f" {Terminal.BOLD}RAM{Terminal.END} {Terminal.color_val(m_pct,70,90)} {Terminal.B}[{bar}]{Terminal.END} {Terminal.fmt_bytes(m_used)}/{Terminal.fmt_bytes(m_tot)}{Terminal.CLR_LINE}")
+        out.append(f"{Terminal.ligne_separateur()}{Terminal.CLR_LINE}")
+        out.append(f"{Terminal.debut_ligne()}{Terminal.BOLD}RAM{Terminal.END} {Terminal.color_val(m_pct,70,90)} {Terminal.B}[{bar}]{Terminal.END} {Terminal.fmt_bytes(m_used)}/{Terminal.fmt_bytes(m_tot)}{Terminal.CLR_LINE}")
 
         # --- DISK I/O ---
-        out.append(f"{Terminal.B}╠{'─'*60}╣{Terminal.END}{Terminal.CLR_LINE}")
-        out.append(f" {Terminal.BOLD}DISK I/O{Terminal.END}{Terminal.CLR_LINE}")
+        out.append(f"{Terminal.ligne_separateur()}{Terminal.CLR_LINE}")
+        out.append(f"{Terminal.debut_ligne()}{Terminal.BOLD}DISK I/O{Terminal.END}{Terminal.CLR_LINE}")
         for name, d in self.disks.items():
             t_str = f"{d['temp']:.0f}°C" if d['temp'] else "--°C"
             rc = Terminal.W if d['rs'] < 1024 else (Terminal.Y if d['rs'] < 100e6 else Terminal.R)
             wc = Terminal.W if d['ws'] < 1024 else (Terminal.Y if d['ws'] < 100e6 else Terminal.R)
             if name not in self.raids:
-                out.append(f" {name:<7} {t_str} R: {rc}{Terminal.fmt_bytes(d['rs'])}/s{Terminal.END} W: {wc}{Terminal.fmt_bytes(d['ws'])}/s{Terminal.END}{Terminal.CLR_LINE}")
+                out.append(f"{Terminal.debut_ligne()}{name:<7} {t_str} R: {rc}{Terminal.fmt_bytes(d['rs'])}/s{Terminal.END} W: {wc}{Terminal.fmt_bytes(d['ws'])}/s{Terminal.END}{Terminal.CLR_LINE}")
             else:
                 dr = self.raids[name]
                 debit = f"{wc}{Terminal.fmt_bytes(d['ws'])}/s{Terminal.END}"
                 raid = f"{dr['raid']}:{Terminal.color_raid(dr['disques'][1:-1])}{Terminal.END}"
                 etat =f" disk:{Terminal.color_etat(dr['etat'][1:-1])}{Terminal.END}{Terminal.END}"
-                out.append(f" {name:<7} {t_str} R: {rc}{Terminal.fmt_bytes(d['rs'])}/s{Terminal.END} W: {debit:<20} {raid}{etat}{Terminal.CLR_LINE}")
+                out.append(f"{Terminal.debut_ligne()}{name:<7} {t_str} R: {rc}{Terminal.fmt_bytes(d['rs'])}/s{Terminal.END} W: {debit:<20} {raid}{etat}{Terminal.CLR_LINE}")
 
         for p in self.cached_parts:
             pct = (p['u']/p['t']*100) if p['t'] else 0
             bar = "█"*int(pct/5) + "░"*(20-int(pct/5))
-            out.append(f" {p['m']:<7} {Terminal.color_val(pct,60,85)} {Terminal.B}[{bar}]{Terminal.END} {Terminal.fmt_bytes(p['u'])}/{Terminal.fmt_bytes(p['t'])}{Terminal.CLR_LINE}")
+            out.append(f"{Terminal.debut_ligne()}{p['m']:<7} {Terminal.color_val(pct,60,85)} {Terminal.B}[{bar}]{Terminal.END} {Terminal.fmt_bytes(p['u'])}/{Terminal.fmt_bytes(p['t'])}{Terminal.CLR_LINE}")
 
         # --- BATTERY ---
         if self.bats:
-            out.append(f"{Terminal.B}╠{'─'*60}╣{Terminal.END}{Terminal.CLR_LINE}")
+            out.append(f"{Terminal.ligne_separateur()}{Terminal.CLR_LINE}")
             for b in self.bats:
                 ic = "⚡" if b['status']=="Charging" else "🔋"
                 out.append(f" {ic} {Terminal.color_val(b['pct'],20,50,True)} [{b['status']}] {b['watts']:.1f}W{Terminal.CLR_LINE}")
 
         # --- GPU ---
-        out.append(f"{Terminal.B}╠{'─'*60}╣{Terminal.END}{Terminal.CLR_LINE}")
+        out.append(f"{Terminal.ligne_separateur()}{Terminal.CLR_LINE}")
         for g in self.gpus:
             ld = Terminal.color_val(g['load'],50,80) if g['load'] is not None else f"{Terminal.W}--%{Terminal.END}"
             tp = Terminal.color_val(g['temp'],60,80,unit="°C")
             xtra = f"Mem:{g['mem']}" if 'mem' in g else f"{g.get('freq')}MHz"
-            out.append(f" {Terminal.C_}{g['name']:<15}{Terminal.END} {tp} Load: {ld} {xtra}{Terminal.CLR_LINE}")
+            out.append(f"{Terminal.debut_ligne()}{Terminal.C_}{g['name']:<15}{Terminal.END} {tp} Load: {ld} {xtra}{Terminal.CLR_LINE}")
 
         # --- CPU ---
-        out.append(f"{Terminal.B}╠{'─'*60}╣{Terminal.END}{Terminal.CLR_LINE}")
+        out.append(f"{Terminal.ligne_separateur()}{Terminal.CLR_LINE}")
         c_ids = sorted(self.cores.keys())
         # Display in 2 columns to save vertical space
         for i in range(0, len(c_ids), 2):
@@ -441,7 +478,7 @@ class SystemMonitor:
             if i+1 < len(c_ids):
                 c2 = self.cores[c_ids[i+1]]
                 s2 = f"│ #{c_ids[i+1]:<2} {Terminal.color_val(c2['usage'],50,85)} {c2['freq']:.1f}G {Terminal.color_val(c2['temp'],60,85,unit='°C')}"
-            out.append(f" {s1:<35} {s2}{Terminal.CLR_LINE}")
+            out.append(f"{Terminal.debut_ligne()}{s1:<35} {s2}{Terminal.CLR_LINE}")
 
         out.append(f"{Terminal.B}╚{'═'*60}╝{Terminal.END}{Terminal.CLR_LINE}")
 
@@ -454,6 +491,8 @@ class SystemMonitor:
         sys.stdout.write(Terminal.CLR_SCR)
         try:
             while True:
+                self.delta_time()
+                self.valeur_systeme()
                 self.render_text()
                 self.tick_counter += 1
                 time.sleep(1)
