@@ -375,7 +375,7 @@ class SystemMonitor:
         self.bats = self.get_battery()
 
 
-    def render(self):
+    def render_text(self):
         """Gathers metrics and generates the full flicker-free display"""
         self.delta_time()
         self.valeur_systeme()
@@ -449,12 +449,12 @@ class SystemMonitor:
         sys.stdout.write("\n".join(out) + "\n")
         sys.stdout.flush()
 
-    def run(self):
+    def run_texte(self):
         """Main execution loop"""
         sys.stdout.write(Terminal.CLR_SCR)
         try:
             while True:
-                self.render()
+                self.render_text()
                 self.tick_counter += 1
                 time.sleep(1)
         except KeyboardInterrupt:
@@ -464,4 +464,4 @@ class SystemMonitor:
 
 if __name__ == "__main__":
     monitor = SystemMonitor()
-    monitor.run()
+    monitor.run_texte()
