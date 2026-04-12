@@ -438,14 +438,15 @@ class SystemMonitor:
             t_str = f"{d['temp']:.0f}°C" if d['temp'] else "--°C"
             rc = Terminal.W if d['rs'] < 1024 else (Terminal.Y if d['rs'] < 100e6 else Terminal.R)
             wc = Terminal.W if d['ws'] < 1024 else (Terminal.Y if d['ws'] < 100e6 else Terminal.R)
-            if name not in self.raids:
-                out.append(f"{Terminal.debut_ligne()}{name:<7} {t_str} R: {rc}{Terminal.fmt_bytes(d['rs'])}/s{Terminal.END} W: {wc}{Terminal.fmt_bytes(d['ws'])}/s{Terminal.END}{Terminal.CLR_LINE}")
-            else:
+
+            debit = f"{wc}{Terminal.fmt_bytes(d['ws'])}/s{Terminal.END}"
+            raid, etat = "", ""
+            if name in self.raids:
                 dr = self.raids[name]
-                debit = f"{wc}{Terminal.fmt_bytes(d['ws'])}/s{Terminal.END}"
                 raid = f"{dr['raid']}:{Terminal.color_raid(dr['disques'][1:-1])}{Terminal.END}"
                 etat =f" disk:{Terminal.color_etat(dr['etat'][1:-1])}{Terminal.END}{Terminal.END}"
-                out.append(f"{Terminal.debut_ligne()}{name:<7} {t_str} R: {rc}{Terminal.fmt_bytes(d['rs'])}/s{Terminal.END} W: {debit:<20} {raid}{etat}{Terminal.CLR_LINE}")
+
+            out.append(f"{Terminal.debut_ligne()}{name:<7} {t_str} R: {rc}{Terminal.fmt_bytes(d['rs'])}/s{Terminal.END} W: {debit:<20} {raid}{etat}{Terminal.CLR_LINE}")
 
         for p in self.cached_parts:
             pct = (p['u']/p['t']*100) if p['t'] else 0
