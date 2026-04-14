@@ -8,7 +8,6 @@ import sys
 import time
 import shutil
 import subprocess
-import re
 from pathlib import Path
 
 # --- Fallback GPU Nvidia ---
@@ -33,14 +32,17 @@ class Terminal:
     CLR_SCR = "\033[2J\033[H" # Clears the entire screen (used only at startup)
     LONGUEUR = 60
 
-    def get_visible_len(ligne: str):
-        """Calcule la longueur réelle du texte sans les codes ANSI."""
-        # Cette regex supprime tous les codes d'échappement ANSI
-        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-        return len(ansi_escape.sub('', ligne))
 
-    def ajout_espace(ligne: str):
-        return (" "*(1+Terminal.LONGUEUR-Terminal.get_visible_len(ligne)))
+    @staticmethod
+    def ajustement_longueur(ligne: str):
+        l = len(ligne)
+        return int(1.5*Terminal.LONGUEUR)
+
+    @staticmethod
+    def ajustement_ligne(ligne: str):
+        l = len(Terminal.ligne_separateur()) - len(ligne)
+        print(ligne, l, len(ligne), len(Terminal.ligne_separateur()))
+        return f""
 
     @staticmethod
     def debut_ligne():
@@ -50,13 +52,13 @@ class Terminal:
     def ligne_separateur():
         return f"{Terminal.B}╠{'─'*Terminal.LONGUEUR}╣{Terminal.END}"
 
-    def ligne_vide():
-        return f"{Terminal.B}║{' '*Terminal.LONGUEUR}║{Terminal.END}"
-
 
     @staticmethod
     def fin_ligne(ligne: str):
-        return f"{ligne}{Terminal.ajout_espace(ligne)}{Terminal.B}║{Terminal.END}"
+
+        return f"{ligne:<91}{Terminal.ajustement_ligne(ligne)}{Terminal.B}║{Terminal.END}"
+        #return f"{ligne}{Terminal.ajustement_ligne(ligne)}{Terminal.B}║{Terminal.END}"
+        #return f"{ligne:<{Terminal.ajustement_longueur(ligne)}}{Terminal.B}║{Terminal.END}"
 
     @staticmethod
     def color_val(val, low=50, high=80, inverse=False, unit="%"):
@@ -472,14 +474,14 @@ class SystemMonitor:
         for p in self.cached_parts:
             pct = (p['u']/p['t']*100) if p['t'] else 0
             bar = "█"*int(pct/5) + "░"*(20-int(pct/5))
-            out.append(Terminal.fin_ligne(f"{Terminal.debut_ligne()}{p['m']:<7} {Terminal.color_val(pct,60,85)} {Terminal.B}[{bar}]{Terminal.END} {Terminal.fmt_bytes(p['u'])}/{Terminal.fmt_bytes(p['t'])}{Terminal.CLR_LINE}"))
+            out.append(f"{Terminal.debut_ligne()}{p['m']:<7} {Terminal.color_val(pct,60,85)} {Terminal.B}[{bar}]{Terminal.END} {Terminal.fmt_bytes(p['u'])}/{Terminal.fmt_bytes(p['t'])}{Terminal.CLR_LINE}")
 
         # --- BATTERY ---
         if self.bats:
             out.append(f"{Terminal.ligne_separateur()}{Terminal.CLR_LINE}")
             for b in self.bats:
                 ic = "⚡" if b['status']=="Charging" else "🔋"
-                out.append(Terminal.fin_ligne(f" {ic} {Terminal.color_val(b['pct'],20,50,True)} [{b['status']}] {b['watts']:.1f}W{Terminal.CLR_LINE}"))
+                out.append(f" {ic} {Terminal.color_val(b['pct'],20,50,True)} [{b['status']}] {b['watts']:.1f}W{Terminal.CLR_LINE}")
 
         # --- GPU ---
         out.append(f"{Terminal.ligne_separateur()}{Terminal.CLR_LINE}")
@@ -487,11 +489,11 @@ class SystemMonitor:
             ld = Terminal.color_val(g['load'],50,80) if g['load'] is not None else f"{Terminal.W}--%{Terminal.END}"
             tp = Terminal.color_val(g['temp'],60,80,unit="°C")
             xtra = f"Mem:{g['mem']}" if 'mem' in g else f"{g.get('freq')}MHz"
-            out.append(Terminal.fin_ligne(f"{Terminal.debut_ligne()}{Terminal.C_}{g['name']:<15}{Terminal.END} {tp} Load: {ld} {xtra}{Terminal.CLR_LINE}"))
+            out.append(f"{Terminal.debut_ligne()}{Terminal.C_}{g['name']:<15}{Terminal.END} {tp} Load: {ld} {xtra}{Terminal.CLR_LINE}")
 
         # --- CPU ---
         out.append(f"{Terminal.ligne_separateur()}{Terminal.CLR_LINE}")
-        out.append(Terminal.fin_ligne(f"{Terminal.debut_ligne()}CPU: {self.cpu_info['name'][0]:<35} Core: {self.cpu_info['core']} {Terminal.CLR_LINE}"))
+        out.append(f"{Terminal.debut_ligne()}CPU: {self.cpu_info['name'][0]:<35} Core: {self.cpu_info['core']} {Terminal.CLR_LINE}")
         out.append(f"{Terminal.ligne_separateur()}{Terminal.CLR_LINE}")
         c_ids = sorted(self.cores.keys())
         # Display in 2 columns to save vertical space
@@ -502,7 +504,7 @@ class SystemMonitor:
             if i+1 < len(c_ids):
                 c2 = self.cores[c_ids[i+1]]
                 s2 = f"│ #{c_ids[i+1]:<2} {Terminal.color_val(c2['usage'],50,85)} {c2['freq']:.1f}G {Terminal.color_val(c2['temp'],60,85,unit='°C')}"
-            out.append(Terminal.fin_ligne(f"{Terminal.debut_ligne()}{s1:<35} {s2}{Terminal.CLR_LINE}"))
+            out.append(f"{Terminal.debut_ligne()}{s1:<35} {s2}{Terminal.CLR_LINE}")
 
         out.append(f"{Terminal.B}╚{'═'*Terminal.LONGUEUR}╝{Terminal.END}{Terminal.CLR_LINE}")
 
