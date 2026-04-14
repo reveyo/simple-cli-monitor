@@ -200,7 +200,6 @@ class SystemMonitor:
         cpu_info = {}
         try:
             cpu_info["count"], cpu_info["cache"], cpu_info["name"] = list(), list(), list()
-            cpu_info["count"] = list()
             for l in self._read_text("/proc/cpuinfo").splitlines():
                 if len(l) == 0:
                     continue
