@@ -30,6 +30,18 @@ class Terminal:
     HOME = "\033[H"       # Moves the cursor to the top left (0,0) without clearing the screen
     CLR_LINE = "\033[K"   # Clears the rest of the current line
     CLR_SCR = "\033[2J\033[H" # Clears the entire screen (used only at startup)
+    LONGUEUR = 60
+
+    @staticmethod
+    def ajustement_longueur(ligne: str):
+        l = len(ligne)
+        return int(1.5*Terminal.LONGUEUR)
+
+    @staticmethod
+    def ajustement_ligne(ligne: str):
+        l = len(Terminal.ligne_separateur()) - len(ligne)
+        print(ligne, l, len(ligne), len(Terminal.ligne_separateur()))
+        return f""
 
     @staticmethod
     def debut_ligne():
@@ -37,7 +49,14 @@ class Terminal:
 
     @staticmethod
     def ligne_separateur():
-        return f"{Terminal.B}╠{'─'*60}╣{Terminal.END}"
+        return f"{Terminal.B}╠{'─'*Terminal.LONGUEUR}╣{Terminal.END}"
+
+    @staticmethod
+    def fin_ligne(ligne: str):
+
+        return f"{ligne:<91}{Terminal.ajustement_ligne(ligne)}{Terminal.B}║{Terminal.END}"
+        #return f"{ligne}{Terminal.ajustement_ligne(ligne)}{Terminal.B}║{Terminal.END}"
+        #return f"{ligne:<{Terminal.ajustement_longueur(ligne)}}{Terminal.B}║{Terminal.END}"
 
     @staticmethod
     def color_val(val, low=50, high=80, inverse=False, unit="%"):
@@ -199,28 +218,30 @@ class SystemMonitor:
         cpu_info = {}
         try:
             name, cache, flags = "", "", ""
-            cpu_info["count"] = list()
+            cpu_info["count"], cpu_info["cache"], cpu_info["name"] = list(), list(), list()
             for l in self._read_text("/proc/cpuinfo").splitlines():
                 if len(l) == 0:
                     continue
                 p = l.split(":")
-                if p and p[0].startswith("model name"):
-                    cpu_info["name"] = p[1]
-                if p and p[0].startswith("cache size"):
-                    cpu_info["cache"] = p[1]
+                if p and p[0].startswith("model name") and p[1] not in cpu_info["name"]:
+                    cpu_info["name"].append(p[1])
+                if p and p[0].startswith("cache size") and p[1] not in cpu_info["cache"]:
+                    cpu_info["cache"].append(p[1])
                 if p and p[0].startswith("flags"):
                     cpu_info["flags"] = p[1]
                 if p and p[0].startswith("processor"):
                     cpu_info["count"].append(p[1])
 
         except Exception: pass
+
         if cpu_info:
             cpu_info["core"] = len(cpu_info["count"])
-            if 'vmx' in  cpu_info["flags"]:
+            if 'flags' in cpu_info.keys() and 'vmx' in  cpu_info["flags"]:
                 cpu_info["virtualiation"] = "Intel VT-x"
-            if 'smv' in  cpu_info["flags"]:
+            if 'flags' in cpu_info.keys() and 'smv' in  cpu_info["flags"]:
                 cpu_info["virtualiation"] = "AMD-V"
 
+        #print(cpu_info)
         return cpu_info
 
     def get_cpu_cores(self, dt):
@@ -420,8 +441,8 @@ class SystemMonitor:
         # UI rendering construction in an array to print only once. 
         # Terminal.HOME resets cursor to (0,0). Terminal.CLR_LINE overwrites ghost characters.
         out = [Terminal.HOME]
-        out.append(f"{Terminal.B}╔{'═'*60}╗{Terminal.END}{Terminal.CLR_LINE}")
-        out.append(f"{Terminal.B}║{Terminal.END} {Terminal.BOLD}SYSTEM MONITOR OOP{Terminal.END} {Terminal.W}{time.strftime('%H:%M:%S')}{Terminal.END}{Terminal.CLR_LINE}")
+        out.append(f"{Terminal.B}╔{'═'*Terminal.LONGUEUR}╗{Terminal.END}{Terminal.CLR_LINE}")
+        out.append(Terminal.fin_ligne(f"{Terminal.B}║{Terminal.END} {Terminal.BOLD}SYSTEM MONITOR OOP{Terminal.END} {Terminal.W}{time.strftime('%H:%M:%S')}{Terminal.END}{Terminal.CLR_LINE}"))
 
         # --- RAM ---
         m_tot = self.mem.get("MemTotal", 1)
@@ -429,11 +450,11 @@ class SystemMonitor:
         m_pct = (m_used / m_tot * 100) if m_tot else 0
         bar = "█"*int(m_pct/5) + "░"*(20-int(m_pct/5))
         out.append(f"{Terminal.ligne_separateur()}{Terminal.CLR_LINE}")
-        out.append(f"{Terminal.debut_ligne()}{Terminal.BOLD}RAM{Terminal.END} {Terminal.color_val(m_pct,70,90)} {Terminal.B}[{bar}]{Terminal.END} {Terminal.fmt_bytes(m_used)}/{Terminal.fmt_bytes(m_tot)}{Terminal.CLR_LINE}")
+        out.append(Terminal.fin_ligne(f"{Terminal.debut_ligne()}{Terminal.BOLD}RAM{Terminal.END} {Terminal.color_val(m_pct,70,90)} {Terminal.B}[{bar}]{Terminal.END} {Terminal.fmt_bytes(m_used)}/{Terminal.fmt_bytes(m_tot)}{Terminal.CLR_LINE}"))
 
         # --- DISK I/O ---
         out.append(f"{Terminal.ligne_separateur()}{Terminal.CLR_LINE}")
-        out.append(f"{Terminal.debut_ligne()}{Terminal.BOLD}DISK I/O{Terminal.END}{Terminal.CLR_LINE}")
+        out.append(Terminal.fin_ligne(f"{Terminal.debut_ligne()}{Terminal.BOLD}DISK I/O{Terminal.END}{Terminal.CLR_LINE}"))
         for name, d in self.disks.items():
             t_str = f"{d['temp']:.0f}°C" if d['temp'] else "--°C"
             rc = Terminal.W if d['rs'] < 1024 else (Terminal.Y if d['rs'] < 100e6 else Terminal.R)
@@ -446,7 +467,7 @@ class SystemMonitor:
                 raid = f"{dr['raid']}:{Terminal.color_raid(dr['disques'][1:-1])}{Terminal.END}"
                 etat =f" disk:{Terminal.color_etat(dr['etat'][1:-1])}{Terminal.END}{Terminal.END}"
 
-            out.append(f"{Terminal.debut_ligne()}{name:<7} {t_str} R: {rc}{Terminal.fmt_bytes(d['rs'])}/s{Terminal.END} W: {debit:<20} {raid}{etat}{Terminal.CLR_LINE}")
+            out.append(Terminal.fin_ligne(f"{Terminal.debut_ligne()}{name:<7} {t_str} R: {rc}{Terminal.fmt_bytes(d['rs'])}/s{Terminal.END} W: {debit:<20} {raid}{etat}{Terminal.CLR_LINE}"))
 
         for p in self.cached_parts:
             pct = (p['u']/p['t']*100) if p['t'] else 0
@@ -470,6 +491,8 @@ class SystemMonitor:
 
         # --- CPU ---
         out.append(f"{Terminal.ligne_separateur()}{Terminal.CLR_LINE}")
+        out.append(f"{Terminal.debut_ligne()}CPU: {self.cpu_info['name'][0]:<35} Core: {self.cpu_info['core']} {Terminal.CLR_LINE}")
+        out.append(f"{Terminal.ligne_separateur()}{Terminal.CLR_LINE}")
         c_ids = sorted(self.cores.keys())
         # Display in 2 columns to save vertical space
         for i in range(0, len(c_ids), 2):
@@ -481,7 +504,7 @@ class SystemMonitor:
                 s2 = f"│ #{c_ids[i+1]:<2} {Terminal.color_val(c2['usage'],50,85)} {c2['freq']:.1f}G {Terminal.color_val(c2['temp'],60,85,unit='°C')}"
             out.append(f"{Terminal.debut_ligne()}{s1:<35} {s2}{Terminal.CLR_LINE}")
 
-        out.append(f"{Terminal.B}╚{'═'*60}╝{Terminal.END}{Terminal.CLR_LINE}")
+        out.append(f"{Terminal.B}╚{'═'*Terminal.LONGUEUR}╝{Terminal.END}{Terminal.CLR_LINE}")
 
         # Write the entire block at once and flush the buffer
         sys.stdout.write("\n".join(out) + "\n")
