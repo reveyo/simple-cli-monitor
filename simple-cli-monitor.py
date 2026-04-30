@@ -241,13 +241,13 @@ class SystemMonitor:
                     continue
                 p = l.split(":")
                 if p and p[0].startswith("model name") and p[1] not in cpu_info["name"]:
-                    cpu_info["name"].append(p[1])
+                    cpu_info["name"].append(p[1].lstrip().rstrip())
                 if p and p[0].startswith("cache size") and p[1] not in cpu_info["cache"]:
-                    cpu_info["cache"].append(p[1])
+                    cpu_info["cache"].append(p[1].lstrip().rstrip())
                 if p and p[0].startswith("flags"):
-                    cpu_info["flags"] = p[1]
+                    cpu_info["flags"] = p[1].lstrip()
                 if p and p[0].startswith("processor"):
-                    cpu_info["count"].append(p[1])
+                    cpu_info["count"].append(p[1].lstrip())
 
         except Exception: pass
 
@@ -509,7 +509,7 @@ class SystemMonitor:
 
         # --- CPU ---
         out.append(f"{Terminal.ligne_separateur()}{Terminal.CLR_LINE}")
-        out.append(Terminal.fin_ligne(f"CPU: {self.cpu_info['name'][0]:<35} Core: {self.cpu_info['core']} {Terminal.CLR_LINE}"))
+        out.append(Terminal.fin_ligne(f"CPU:{self.cpu_info['name'][0]:<35} Core:{self.cpu_info['core']} {Terminal.CLR_LINE}"))
         out.append(f"{Terminal.ligne_separateur()}{Terminal.CLR_LINE}")
         c_ids = sorted(self.cores.keys())
         # Display in 2 columns to save vertical space
