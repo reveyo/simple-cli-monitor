@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 """
 Ubuntu Monitor - OPTIMIZED & OOP (CPU, GPU, RAM, Disk I/O, Battery)
 A lightweight system monitor designed for hybrid hardware configurations.
@@ -117,6 +118,17 @@ class Terminal:
         return res
 
 class SystemMonitor:
+
+    HW = "/sys/class/hwmon"
+
+    DRM = "/sys/class/drm"
+    DEVICE = "device/vendor"
+
+    MEM_INFO = "/proc/meminfo"
+    CPU_INFO = "/proc/cpuinfo"
+
+    PS = "/sys/class/power_supply"
+
     def __init__(self):
         # Internal state to compute deltas between T and T-1
         self.sysfs_cache = {"hwmon_nvme": None, "hwmon_cpu": {}, "drm_cards": []}
@@ -151,7 +163,7 @@ class SystemMonitor:
         Scanning /sys on every tick is expensive. We cache the paths for 
         thermal sensors and GPUs once.
         """
-        hw = Path("/sys/class/hwmon")
+        hw = Path(SystemMonitor.HW)
         if hw.exists():
             for h in hw.iterdir():
                 name = self._read_text(h/"name")
@@ -167,10 +179,10 @@ class SystemMonitor:
                         except (ValueError, IndexError): pass
         
         # Detect integrated GPUs via Direct Rendering Manager (DRM) API
-        drm = Path("/sys/class/drm")
+        drm = Path(SystemMonitor.DRM)
         if drm.exists():
             for c in drm.glob("card[0-9]*"):
-                vid = self._read_text(c/"device/vendor")
+                vid = self._read_text(c/SystemMonitor.DEVICE)
                 # 0x8086 = Intel, 0x1002 = AMD
                 if vid in ["0x8086", "0x1002"]:
                     self.sysfs_cache["drm_cards"].append({"path": c, "vid": vid})
@@ -197,7 +209,7 @@ class SystemMonitor:
         """Reads available RAM from /proc/meminfo."""
         mem = {}
         try:
-            for l in self._read_text("/proc/meminfo").splitlines():
+            for l in self._read_text(SystemMonitor.MEM_INFO).splitlines():
                 if ":" in l:
                     k, v = l.split(":", 1)
                     # The value is in kB, convert it to bytes
@@ -221,7 +233,7 @@ class SystemMonitor:
     def get_battery(self):
         """Reads battery state from the power_supply subsystem."""
         bats = []
-        ps = Path("/sys/class/power_supply")
+        ps = Path(SystemMonitor.PS)
         if ps.exists():
             for b in ps.iterdir():
                 if b.name.startswith("BAT"):
@@ -236,7 +248,7 @@ class SystemMonitor:
         cpu_info = {}
         try:
             cpu_info["count"], cpu_info["cache"], cpu_info["name"] = list(), list(), list()
-            for l in self._read_text("/proc/cpuinfo").splitlines():
+            for l in self._read_text(SystemMonitor.CPU_INFO).splitlines():
                 if len(l) == 0:
                     continue
                 p = l.split(":")
