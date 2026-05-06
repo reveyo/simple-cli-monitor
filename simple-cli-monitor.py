@@ -456,7 +456,8 @@ class SystemMonitor:
         self.mem = self.get_mem()
         self.bats = self.get_battery()
 
-
+    def mise_ligne_core(self, id, core):
+        return f"#{id:<3} {Terminal.color_val(core['usage'],50,85)} {core['freq']:.1f}G {Terminal.color_val(core['temp'],60,85,unit='°C')}"
 
     def render_text(self):
         """Gathers metrics and generates the full flicker-free display"""
@@ -520,13 +521,12 @@ class SystemMonitor:
         c_ids = sorted(self.cores.keys())
         # Display in 2 columns to save vertical space
         for i in range(0, len(c_ids), 2):
-            c1 = self.cores[c_ids[i]]
-            s1 = f"#{c_ids[i]:<2} {Terminal.color_val(c1['usage'],50,85)} {c1['freq']:.1f}G {Terminal.color_val(c1['temp'],60,85,unit='°C')}"
-            s2 = ""
+            s1 = self.mise_ligne_core(c_ids[i], self.cores[c_ids[i]])
             if i+1 < len(c_ids):
-                c2 = self.cores[c_ids[i+1]]
-                s2 = f"│ #{c_ids[i+1]:<2} {Terminal.color_val(c2['usage'],50,85)} {c2['freq']:.1f}G {Terminal.color_val(c2['temp'],60,85,unit='°C')}"
-            out.append(Terminal.fin_ligne(f"{Terminal.ajustement_texte(s1,Terminal.CPU_LONGUEUR)} {Terminal.ajustement_texte(s2,Terminal.CPU_LONGUEUR)}{Terminal.CLR_LINE}"))
+                s2 = self.mise_ligne_core(c_ids[i+1], self.cores[c_ids[i+1]])
+            else:
+                s2 = ""
+            out.append(Terminal.fin_ligne(f"{Terminal.ajustement_texte(s1,Terminal.CPU_LONGUEUR)}│ {Terminal.ajustement_texte(s2,Terminal.CPU_LONGUEUR)}{Terminal.CLR_LINE}"))
 
         out.append(Terminal.bottom_table())
 
