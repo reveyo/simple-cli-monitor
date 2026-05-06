@@ -34,6 +34,7 @@ class Terminal:
     DEBUT = 1
     LONGUEUR = 60
     LONGUEUR_TOTAL = LONGUEUR + DEBUT
+    CPU_LONGUEUR = int(LONGUEUR / 2) - 2
 
 
     @staticmethod
@@ -48,8 +49,8 @@ class Terminal:
         return len(ansi_escape.sub('', ligne))
 
     @staticmethod
-    def ajout_espace(ligne: str):
-        return (" "*(Terminal.LONGUEUR-Terminal.get_visible_len(ligne)))
+    def ajout_espace(ligne: str, longueur:int=LONGUEUR):
+        return (" "*(longueur -Terminal.get_visible_len(ligne)))
 
     @staticmethod
     def barre_ligne():
@@ -70,6 +71,11 @@ class Terminal:
     @staticmethod
     def ligne_vide():
         return f"{Terminal.B}║{' '*(Terminal.LONGUEUR_TOTAL)}║{Terminal.END}"
+
+
+    @staticmethod
+    def ajustement_texte(texte:str, longueur:int):
+        return f"{texte}{Terminal.ajout_espace(texte, longueur)}"
 
 
     @staticmethod
@@ -520,7 +526,7 @@ class SystemMonitor:
             if i+1 < len(c_ids):
                 c2 = self.cores[c_ids[i+1]]
                 s2 = f"│ #{c_ids[i+1]:<2} {Terminal.color_val(c2['usage'],50,85)} {c2['freq']:.1f}G {Terminal.color_val(c2['temp'],60,85,unit='°C')}"
-            out.append(Terminal.fin_ligne(f"{s1:<35} {s2}{Terminal.CLR_LINE}"))
+            out.append(Terminal.fin_ligne(f"{Terminal.ajustement_texte(s1,Terminal.CPU_LONGUEUR)} {Terminal.ajustement_texte(s2,Terminal.CPU_LONGUEUR)}{Terminal.CLR_LINE}"))
 
         out.append(Terminal.bottom_table())
 
