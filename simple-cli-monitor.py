@@ -457,7 +457,10 @@ class SystemMonitor:
         self.bats = self.get_battery()
 
     def mise_ligne_core(self, id, core):
-        return f"#{id:<3} {Terminal.color_val(core['usage'],50,85)} {core['freq']:.1f}G {Terminal.color_val(core['temp'],60,85,unit='°C')}"
+        charge = Terminal.ajustement_texte(f"{Terminal.color_val(core['usage'],50,85)}", 5)
+        frequence = f"{core['freq']:.1f}G"
+        temp = f"{Terminal.color_val(core['temp'],60,85,unit='°C')}"
+        return f"#{id:<3} {charge} {frequence} {temp}"
 
     def render_text(self):
         """Gathers metrics and generates the full flicker-free display"""
